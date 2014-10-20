@@ -28,7 +28,7 @@ def request_apartments_from_craigslist(
         conn = urllib2.urlopen("http://seattle.craigslist.org/search/apa",
                                encoded_request)
         print conn.headers
-        out_file = io.open("results.html", "wb")
+        out_file = io.open("apartments.html", "wb")
         out_file.write(conn.read())
     except:
         raise
