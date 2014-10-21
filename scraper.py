@@ -36,7 +36,7 @@ def request_apartments_from_craigslist(
 def read_search_results():
     """Return results as if from request_apartments_from_craigslist, but
     using the file apartments.html instead"""
-    resultsfile = io.open("apartments.html", "rb")
+    resultsfile = io.open("apartments.html", "r", encoding="utf-8")
     return resultsfile.read(), "utf-8"
 
 
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     elif len(sys.argv) > 1:
         raise ValueError("The only command-line argument allowed is 'test'")
     else:
-        raw_test = request_apartments_from_craigslist(query="Magnolia",
+        raw_text = request_apartments_from_craigslist(query="Queen Anne",
                                                       bedrooms=2,
                                                       maxAsk=2000,
                                                       housing_type=1)[0]
