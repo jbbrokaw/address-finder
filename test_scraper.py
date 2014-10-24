@@ -12,7 +12,11 @@ from scraper import read_search_results
 from scraper import parse_source
 from scraper import extract_listings
 from scraper import add_location
+from scraper import format_google_request_parameters
+from scraper import ask_google_for_address
+from scraper import add_google_address
 from copy import copy
+import types
 
 
 def test_request_apartments_from_craigslist():
@@ -49,15 +53,15 @@ def test_parse_source():
 def test_extract_listings():
     with pytest.raises(TypeError):
         extract_listings()
-    with pytest.raises(AttributeError):  # Could change this but eh
-        extract_listings(None)
+    with pytest.raises(AttributeError):
+        extract_listings(None).next()
 
     response, encoding = read_search_results()
     parsed_page = parse_source(response)
-    listings = extract_listings(parsed_page)
-    assert isinstance(listings, list)
-    assert isinstance(listings[0], dict)
-    testdict = listings[0]
+    listing_generator = extract_listings(parsed_page)
+    assert isinstance(listing_generator, types.GeneratorType)
+    testdict = listing_generator.next()
+    assert isinstance(testdict, dict)
     assert isinstance(testdict['size'], unicode)
     assert "br" in testdict['size']
     assert isinstance(testdict['description'], unicode)
@@ -76,10 +80,11 @@ def test_add_location():
 
     response, encoding = read_search_results()
     parsed_page = parse_source(response)
-    listings = extract_listings(parsed_page)
-    olddict = copy(listings[0])
-    add_location(listings[0])
-    newdict = listings[0]
+    listing_generator = extract_listings(parsed_page)
+    listing = listing_generator.next()
+    olddict = copy(listing)
+    add_location(listing)
+    newdict = listing
     assert len(newdict) == len(olddict) + 1  # Added a single entry, "location"
     for key in olddict:
         assert olddict[key] == newdict[key]
@@ -96,4 +101,63 @@ def test_add_location():
     float(locationdict['data-longitude'])
 
 
+def test_format_google_request_parameters():
+    """This function should return valid request parameters (dictionary)
+    to send to google, given scraped location dictionary"""
+    with pytest.raises(TypeError):
+        format_google_request_parameters()  # listing required
 
+    response, encoding = read_search_results()
+    parsed_page = parse_source(response)
+    listing_generator = extract_listings(parsed_page)
+    listing = listing_generator.next()
+    add_location(listing)
+
+    request_params = format_google_request_parameters(listing['location'])
+    assert isinstance(request_params, dict)
+    assert 'latlng' in request_params
+    assert request_params['sensor'] == 'false'
+
+
+def test_ask_google_for_address():
+    """This function should return google's response (dictionary)
+    given a listing with location data"""
+    with pytest.raises(TypeError):
+        ask_google_for_address()  # listing required
+
+    response, encoding = read_search_results()
+    parsed_page = parse_source(response)
+    listing_generator = extract_listings(parsed_page)
+    listing = listing_generator.next()
+    add_location(listing)
+
+    goog_data = ask_google_for_address(listing)
+    assert isinstance(goog_data, dict)
+    assert 'results' in goog_data
+    assert isinstance(goog_data['results'], list)
+    first_result = goog_data['results'][0]
+    assert isinstance(first_result, dict)
+
+    # We are implicitly testing find_best_address() here, too
+    assert 'types' in first_result
+    assert 'street_address' in first_result['types']
+    # I'm more or less assuming the above is the case;
+    # google seems to reliably do this
+    assert 'formatted_address' in first_result
+    assert isinstance(first_result['formatted_address'], unicode)
+
+
+def test_add_google_address():
+    """add_google_address(listing, address) should add address (string) to
+    the listing dictionary"""
+    with pytest.raises(TypeError):
+        add_google_address()
+    with pytest.raises(TypeError):
+        add_google_address(None)
+    with pytest.raises(TypeError):
+        add_google_address(None, "123 Fake Street")
+
+    test_listing = {}
+    add_google_address(test_listing, "123 Fake Street")
+    assert 'address' in test_listing
+    assert test_listing['address'] == '123 Fake Street'
